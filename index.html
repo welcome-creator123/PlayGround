@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BREACHPOINT // Tactical Response</title>
+  <style>
+    :root { --amber:#e0ad46; --green:#85c9a2; --red:#d44d43; --ink:#09100f; }
+    * { box-sizing:border-box; }
+    html,body { width:100%; height:100%; margin:0; overflow:hidden; background:#080c0b; color:#ddd; font-family:"Arial Narrow", "Roboto Condensed", Arial, sans-serif; }
+    canvas { display:block; width:100%; height:100%; }
+    #hud { position:fixed; inset:0; pointer-events:none; user-select:none; }
+    #topbar { position:absolute; left:28px; right:28px; top:18px; display:flex; justify-content:space-between; align-items:flex-start; }
+    .brand { letter-spacing:3px; font-size:12px; color:#aaa; } .brand b { color:var(--amber); }
+    #mission { text-align:right; font-size:11px; letter-spacing:2px; color:#aaa; }
+    #mission strong { display:block; color:#eee; font-size:16px; letter-spacing:1px; margin-top:4px; }
+    #crosshair { position:absolute; left:50%; top:50%; width:28px; height:28px; transform:translate(-50%,-50%); opacity:.9; }
+    #crosshair:before,#crosshair:after { content:""; position:absolute; background:#ece9dc; box-shadow:0 0 2px #000; }
+    #crosshair:before { width:2px; height:28px; left:13px; top:0; } #crosshair:after { height:2px; width:28px; left:0; top:13px; }
+    #crosshair i { position:absolute; width:6px; height:6px; border:1px solid #ece9dc; left:11px; top:11px; }
+    #bottom { position:absolute; left:28px; right:28px; bottom:24px; display:flex; align-items:flex-end; justify-content:space-between; }
+    #health { width:220px; } .label { font-size:10px; letter-spacing:2px; color:#999; margin-bottom:7px; }
+    .bar { height:5px; background:rgba(255,255,255,.12); } #healthfill { height:100%; width:100%; background:var(--green); transition:.25s; }
+    #objective { text-align:right; max-width:380px; } #objective strong { display:block; font-size:13px; letter-spacing:1px; color:#eee; margin-bottom:4px; } #objective span { font-size:11px; color:#aaa; }
+    #weapon { position:absolute; left:50%; bottom:28px; transform:translateX(-50%); text-align:center; }
+    #weaponName { font-size:11px; letter-spacing:3px; color:#bbb; } #ammo { font-family:"Courier New",monospace; font-size:31px; color:#eee; letter-spacing:-2px; margin-top:2px; }
+    #interaction { position:absolute; left:50%; top:59%; transform:translateX(-50%); font-size:12px; letter-spacing:1px; color:#fff; background:rgba(8,12,11,.8); border:1px solid rgba(255,255,255,.15); padding:8px 12px; opacity:0; }
+    #hitmarker { position:absolute; left:50%; top:50%; width:34px; height:34px; transform:translate(-50%,-50%) rotate(45deg); opacity:0; }
+    #hitmarker:before,#hitmarker:after { content:""; position:absolute; background:#fff; } #hitmarker:before { width:22px;height:3px;left:6px;top:16px;} #hitmarker:after { width:3px;height:22px;left:16px;top:6px; }
+    #compass { position:absolute; left:50%; top:14px; transform:translateX(-50%); width:300px; text-align:center; color:#bbb; font-family:"Courier New",monospace; font-size:10px; letter-spacing:6px; }
+    #damage { position:absolute; inset:0; background:radial-gradient(circle,transparent 45%,rgba(180,20,10,.55)); opacity:0; transition:opacity .15s; }
+    #overlay { position:fixed; inset:0; z-index:10; display:flex; align-items:center; justify-content:center; background:rgba(6,9,8,.78); }
+    .panel { width:min(520px,calc(100% - 40px)); border-left:3px solid var(--amber); background:rgba(14,20,18,.96); padding:34px 38px; box-shadow:0 20px 60px #000; }
+    .eyebrow { color:var(--amber); letter-spacing:4px; font-size:10px; margin-bottom:10px; } h1 { margin:0 0 10px; font-size:38px; letter-spacing:5px; font-weight:800; } .brief { color:#aaa; line-height:1.6; font-size:13px; }
+    .controls { display:grid; grid-template-columns:1fr 1fr; gap:8px 24px; margin:22px 0; border-top:1px solid #333; border-bottom:1px solid #333; padding:14px 0; color:#aaa; font-size:11px; }
+    kbd { display:inline-block; min-width:24px; text-align:center; background:#262d2a; color:#eee; border:1px solid #4b554f; padding:3px 5px; margin-right:7px; }
+    button { pointer-events:auto; border:1px solid #8d7a50; background:var(--amber); color:#111; padding:13px 18px; font-weight:bold; letter-spacing:2px; cursor:pointer; } button:hover { background:#efc75f; }
+    #toast { position:absolute; left:50%; top:24%; transform:translateX(-50%); background:rgba(10,14,13,.9); border:1px solid #555; padding:10px 16px; font-size:12px; letter-spacing:2px; opacity:0; transition:.25s; }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <div id="hud">
+    <div id="damage"></div>
+    <div id="topbar"><div class="brand">BREACHPOINT <b>// UNIT 04</b></div><div id="mission">OPERATION<strong>GLASS HOUSE</strong></div></div>
+    <div id="compass">W&nbsp;&nbsp; 285 &nbsp;&nbsp; NW &nbsp;&nbsp; 345 &nbsp;&nbsp; N &nbsp;&nbsp; 015 &nbsp;&nbsp; NE</div>
+    <div id="crosshair"><i></i></div><div id="hitmarker"></div>
+    <div id="interaction"></div><div id="toast"></div>
+    <div id="bottom"><div id="health"><div class="label">VITALS</div><div class="bar"><div id="healthfill"></div></div></div><div id="weapon"><div id="weaponName">M4A1 // 5.56</div><div id="ammo"><span id="ammoCount">30</span> / 180</div></div><div id="objective"><strong id="objTitle">SECURE THE HOSTAGES</strong><span id="objCount">Hostages secured: 0 / 2</span></div></div>
+  </div>
+  <div id="overlay"><div class="panel"><div class="eyebrow">TACTICAL RESPONSE // 02:14</div><h1>GLASS HOUSE</h1><div class="brief">An armed militia has seized an abandoned office. Locate and secure both civilians. Neutralize hostiles and avoid crossfire.</div><div class="controls"><div><kbd>WASD</kbd> MOVE</div><div><kbd>MOUSE</kbd> AIM</div><div><kbd>F</kbd> SECURE / INTERACT</div><div><kbd>R</kbd> RELOAD</div><div><kbd>LMB</kbd> FIRE</div><div><kbd>SHIFT</kbd> SPRINT</div></div><button id="start">BEGIN OPERATION</button></div></div>
+  <script>
+  (() => {
+    const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+    let W,H,dpr,started=false,keys={},mouse={x:0,y:0,down:false},last=0,health=100,ammo=30,reserve=180,reloading=false;
+    const player={x:240,y:520,a:-.55};
+    const walls=[{x:120,y:100,w:760,h:18},{x:120,y:100,w:18,h:530},{x:862,y:100,w:18,h:530},{x:120,y:612,w:760,h:18},{x:310,y:100,w:18,h:230},{x:310,y:410,w:18,h:220},{x:500,y:230,w:230,h:18},{x:500,y:230,w:18,h:240},{x:500,y:452,w:230,h:18},{x:700,y:330,w:180,h:18}];
+    const enemies=[{x:570,y:150,hp:2,alive:true,angle:0,alert:false},{x:790,y:520,hp:2,alive:true,angle:0,alert:false},{x:650,y:390,hp:2,alive:true,angle:0,alert:false}];
+    const hostages=[{x:400,y:180,secured:false},{x:790,y:280,secured:false}];
+    const decals=[]; let particles=[];
+    function resize(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;canvas.width=W*dpr;canvas.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);} addEventListener('resize',resize);resize();
+    addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.key.toLowerCase()==='r')reload();if(e.key.toLowerCase()==='f')interact();});
+    addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+    canvas.addEventListener('mousedown',e=>{mouse.down=true;shoot();});addEventListener('mouseup',()=>mouse.down=false);
+    canvas.addEventListener('mousemove',e=>{mouse.x=e.clientX;mouse.y=e.clientY;});
+    document.getElementById('start').onclick=()=>{document.getElementById('overlay').style.display='none';started=true;canvas.requestPointerLock?.();last=performance.now();requestAnimationFrame(loop);};
+    function toast(s){const t=document.getElementById('toast');t.textContent=s;t.style.opacity=1;clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.opacity=0,1800)}
+    function reload(){if(reloading||ammo===30||reserve===0)return;reloading=true;toast('RELOADING');setTimeout(()=>{let n=Math.min(30-ammo,reserve);ammo+=n;reserve-=n;reloading=false;updateAmmo()},1300)}
+    function updateAmmo(){document.getElementById('ammoCount').textContent=ammo}
+    function collides(x,y,r=10){if(x-r<120||x+r>880||y-r<100||y+r>630)return true;return walls.some(w=>x+r>w.x&&x-r<w.x+w.w&&y+r>w.y&&y-r<w.y+w.h)}
+    function interact(){for(const h of hostages){if(!h.secured&&Math.hypot(h.x-player.x,h.y-player.y)<55){h.secured=true;toast('CIVILIAN SECURED');updateObj();return}}}
+    function updateObj(){const n=hostages.filter(h=>h.secured).length;document.getElementById('objCount').textContent=`Hostages secured: ${n} / 2`;if(n===2){document.getElementById('objTitle').textContent='EXTRACT TO SOUTH EGRESS';toast('HOSTAGES SECURED // EXFIL OPEN')}}
+    function shoot(){if(!started||reloading)return;if(ammo<=0){toast('MAGAZINE EMPTY');reload();return}ammo--;updateAmmo();const ox=player.x,oy=player.y;let tx=player.x+Math.cos(player.a)*900,ty=player.y+Math.sin(player.a)*900;let best=900,hit=null;
+      for(const e of enemies){if(!e.alive)continue;const dx=e.x-ox,dy=e.y-oy,along=dx*Math.cos(player.a)+dy*Math.sin(player.a),perp=Math.abs(-dx*Math.sin(player.a)+dy*Math.cos(player.a));if(along>0&&along<best&&perp<14){best=along;hit=e}}
+      if(hit){tx=hit.x;ty=hit.y;hit.hp--;for(let i=0;i<5;i++)particles.push({x:hit.x,y:hit.y,vx:(Math.random()-0.5)*3,vy:(Math.random()-0.5)*3,t:15});if(hit.hp<=0){hit.alive=false;toast('HOSTILE NEUTRALIZED')}const hm=document.getElementById('hitmarker');hm.style.opacity=1;setTimeout(()=>hm.style.opacity=0,90)}
+      decals.push({x:tx,y:ty,t:300});for(let i=0;i<8;i++)particles.push({x:tx,y:ty,vx:(Math.random()-0.5)*2,vy:(Math.random()-0.5)*2,t:20});
+    }
+    function update(dt){const sp=(keys.shift?145:95)*dt/1000,cos=Math.cos(player.a),sin=Math.sin(player.a);let dx=0,dy=0;if(keys.w){dx+=cos*sp;dy+=sin*sp}if(keys.s){dx-=cos*sp;dy-=sin*sp}if(keys.a){dx+=-sin*sp;dy+=cos*sp}if(keys.d){dx+=sin*sp;dy-=cos*sp}if(!collides(player.x+dx,player.y))player.x+=dx;if(!collides(player.x,player.y+dy))player.y+=dy;
+      // Aim follows mouse relative to screen center, with a restrained first-person spin
+      const mx=(mouse.x-W/2)/Math.max(W/3,1);player.a+=mx*.018;
+      for(const e of enemies){if(!e.alive)continue;const d=Math.hypot(e.x-player.x,e.y-player.y);e.angle=Math.atan2(player.y-e.y,player.x-e.x);if(d<240){e.alert=true;if(d<180&&Math.random()<dt*.00035){health-=3;const dm=document.getElementById('damage');dm.style.opacity=.8;setTimeout(()=>dm.style.opacity=0,130);document.getElementById('healthfill').style.width=Math.max(0,health)+'%';if(health<=0){started=false;document.querySelector('.eyebrow').textContent='UNIT STATUS // DOWN';document.querySelector('h1').textContent='MISSION FAILED';document.querySelector('.brief').textContent='Your team was incapacitated. Reset and try the operation again.';document.getElementById('start').textContent='REDEPLOY';document.getElementById('overlay').style.display='flex'}}}}
+      for(const h of hostages){if(!h.secured&&Math.hypot(h.x-player.x,h.y-player.y)<55)document.getElementById('interaction').style.opacity=1,document.getElementById('interaction').textContent='[ F ] SECURE CIVILIAN';else if(document.getElementById('interaction').dataset.hide!==h.x){} } 
+      let near=false;for(const h of hostages)if(!h.secured&&Math.hypot(h.x-player.x,h.y-player.y)<55)near=true;if(!near)document.getElementById('interaction').style.opacity=0;
+      particles.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.t-=dt*.06});particles=particles.filter(p=>p.t>0);
+      if(mouse.down&&Math.random()<.08)shoot();
+    }
+    function project(x,y){const dx=x-player.x,dy=y-player.y,c=Math.cos(-player.a),s=Math.sin(-player.a);return{x:W/2+(dx*c-dy*s),y:H/2+(dx*s+dy*c)*.55,depth:Math.hypot(dx,dy)}}
+    function draw(){ctx.fillStyle='#1a211e';ctx.fillRect(0,0,W,H);ctx.fillStyle='#111614';ctx.fillRect(0,H*.55,W,H*.45);
+      // floor grid
+      ctx.strokeStyle='rgba(150,170,155,.07)';ctx.lineWidth=1;for(let y=H*.55;y<H;y+=45){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}for(let x=0;x<W;x+=80){ctx.beginPath();ctx.moveTo(W/2+(x-W/2)*.25,H*.55);ctx.lineTo(W/2+(x-W/2)*2,H);ctx.stroke()}
+      // map camera transform
+      const scale=Math.min(W/980,H/760)*1.45;
+      ctx.save();ctx.translate(W/2-H*.01,H/2);ctx.rotate(player.a);ctx.translate(-player.x*scale,-player.y*scale);
+      ctx.fillStyle='#202825';ctx.fillRect(120*scale,100*scale,760*scale,530*scale);
+      ctx.strokeStyle='rgba(200,210,190,.08)';ctx.lineWidth=1;for(let x=120;x<880;x+=50){ctx.beginPath();ctx.moveTo(x*scale,100*scale);ctx.lineTo(x*scale,630*scale);ctx.stroke()}for(let y=100;y<630;y+=50){ctx.beginPath();ctx.moveTo(120*scale,y*scale);ctx.lineTo(880*scale,y*scale);ctx.stroke()}
+      ctx.fillStyle='#3a423d';for(const w of walls)ctx.fillRect(w.x*scale,w.y*scale,w.w*scale,w.h*scale);
+      ctx.fillStyle='#151a18';ctx.fillRect(120*scale,615*scale,760*scale,15*scale);
+      ctx.fillStyle='#d7b95d';ctx.font=`${11*scale}px Arial`;ctx.fillText('SOUTH EGRESS',390*scale,625*scale);
+      for(const h of hostages){ctx.save();ctx.translate(h.x*scale,h.y*scale);ctx.fillStyle=h.secured?'#75a98b':'#d8d2b7';ctx.beginPath();ctx.arc(0,0,9*scale,0,7);ctx.fill();ctx.fillStyle='#46514c';ctx.fillRect(-5*scale,-16*scale,10*scale,12*scale);ctx.restore()}
+      for(const e of enemies){if(!e.alive)continue;ctx.save();ctx.translate(e.x*scale,e.y*scale);ctx.rotate(e.angle+player.a);ctx.fillStyle=e.alert?'#a84b43':'#262e2b';ctx.beginPath();ctx.arc(0,0,11*scale,0,7);ctx.fill();ctx.fillStyle='#111';ctx.fillRect(5*scale,-3*scale,16*scale,6*scale);ctx.restore()}
+      ctx.fillStyle='#e5dfc9';ctx.beginPath();ctx.arc(player.x*scale,player.y*scale,8*scale,0,7);ctx.fill();ctx.strokeStyle='#b7b7a8';ctx.lineWidth=2*scale;ctx.beginPath();ctx.moveTo(player.x*scale,player.y*scale);ctx.lineTo((player.x+Math.cos(player.a)*24)*scale,(player.y+Math.sin(player.a)*24)*scale);ctx.stroke();
+      ctx.restore();
+      // vignette and scan lines
+      const g=ctx.createRadialGradient(W/2,H/2,H*.25,W/2,H/2,H*.75);g.addColorStop(0,'transparent');g.addColorStop(1,'rgba(0,0,0,.48)');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+      ctx.fillStyle='rgba(255,255,255,.025)';for(let y=0;y<H;y+=4)ctx.fillRect(0,y,W,1);
+    }
+    function loop(t){const dt=Math.min(40,t-last);last=t;if(started)update(dt);draw();if(started)requestAnimationFrame(loop)}
+  })();
+  </script>
+</body>
+</html>
